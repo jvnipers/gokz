@@ -26,22 +26,14 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Get version from merged PR
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: version
         run: |
-          PR_TITLE=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].title // ""')
-          VERSION=$(echo "$PR_TITLE" | grep -oP 'v?\d+\.\d+\.\d+' | head -1)
+          VERSION=$(grep -oP '(?<=#define GOKZ_VERSION ")[^"]+' addons/sourcemod/scripting/include/gokz/version.inc)
           if [ -z "$VERSION" ]; then
-            echo "No version found in PR title: '${PR_TITLE}'" >&2
+            echo "Could not parse version from version.inc" >&2
             exit 1
           fi
           echo "GOKZ_VERSION=${VERSION}" >> $GITHUB_ENV
-
-      - name: version
-        if: github.ref != 'refs/heads/master' || github.event_name != 'push'
-        run: echo "GOKZ_VERSION=$(git describe --tags --exact-match 2> /dev/null || git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: compile
         run: |
@@ -53,7 +45,6 @@ jobs:
           wget -q -O - "http://sourcemod.net/latest.php?os=linux&version=${{env.SM_VERSION}}" | tar x -zf -
           cp -r ../addons .
           cd ./addons/sourcemod/scripting
-          echo "#define GOKZ_VERSION \"${GOKZ_VERSION}\"" > include/gokz/version.inc
           for file in gokz-*.sp; do ./spcomp $file; done;
           cd ../../../../
           mkdir -p addons/sourcemod/plugins
